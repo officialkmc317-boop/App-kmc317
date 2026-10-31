@@ -1404,8 +1404,8 @@
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-[10px] font-bold text-gray-500 mb-1">ID Anggota</label>
-                                <input type="text" id="f_id" value="${data.id}" readonly class="w-full bg-gray-100 border border-gray-200 rounded-xl p-2.5 text-xs font-bold text-gray-600 outline-none">
+                                <label class="block text-[10px] font-bold text-gray-500 mb-1">ID Anggota / No. Registrasi *</label>
+                                <input type="text" id="f_id" value="${data.id}" placeholder="Cth: KMC-001" class="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs font-bold text-gray-800 focus:ring-2 focus:ring-yellow-500 outline-none">
                             </div>
                             <div>
                                 <label class="block text-[10px] font-bold text-gray-500 mb-1">Tgl Bergabung</label>
@@ -1475,14 +1475,31 @@
         }
 
         function simpanAnggota(idx) {
+            let idBaru = document.getElementById('f_id').value.trim();
             let nama = document.getElementById('f_nama').value.trim();
+            if (!idBaru) {
+                showToast("ID Anggota wajib diisi!");
+                return;
+            }
             if (!nama) {
                 showToast("Nama lengkap wajib diisi!");
                 return;
             }
+            if (dataAnggota.some((ag, i) => i !== idx && (ag.id || "").toLowerCase() === idBaru.toLowerCase())) {
+                showToast("ID Anggota tersebut sudah digunakan anggota lain!");
+                return;
+            }
+
+            if (idx !== null && dataAnggota[idx]) {
+                let idLama = dataAnggota[idx].id;
+                if (idLama !== idBaru) {
+                    let iurLama = dataIuran.find(i => i.id === idLama);
+                    if (iurLama) iurLama.id = idBaru;
+                }
+            }
 
             let data = {
-                id: document.getElementById('f_id').value,
+                id: idBaru,
                 nama: nama,
                 jabatan: document.getElementById('f_jabatan').value,
                 motor: document.getElementById('f_motor').value.trim(),
