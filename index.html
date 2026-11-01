@@ -68,6 +68,10 @@
                 </div>
             </div>
             <div class="flex items-center space-x-1.5 shrink-0">
+                <button onclick="sinkronPaksaSekarang()" id="btn-cloud-sync-header" title="Ketuk untuk tarik/sinkronkan data terbaru dari Cloud" class="bg-gray-800 hover:bg-gray-700 text-emerald-400 px-2.5 py-1.5 rounded-full text-[10px] font-bold flex items-center space-x-1 transition border border-gray-600 shadow-sm">
+                    <i id="icon-cloud-header" class="fa-solid fa-cloud-arrow-down"></i>
+                    <span id="text-cloud-header" class="hidden sm:inline">Sync</span>
+                </button>
                 <button onclick="bukaModalLogin()" id="btn-admin-status" class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded-full text-[11px] font-semibold flex items-center space-x-1.5 transition border border-gray-600 shadow-sm">
                     <i id="icon-lock" class="fa-solid fa-lock text-yellow-500"></i>
                     <span id="text-admin-status">Member</span>
@@ -325,12 +329,48 @@
 
         let autoSyncCloud = true;
         let autoSyncTimer = null;
+        let isSyncingToCloud = false;
+        let hasPendingCloudSave = false;
+        let lastLocalEditTimestamp = 0;
         let lastCloudSyncStatus = "Lokal Aktif";
+
+        function setIndikatorCloudHeader(status, teks) {
+            const icon = document.getElementById('icon-cloud-header');
+            const label = document.getElementById('text-cloud-header');
+            const btn = document.getElementById('btn-cloud-sync-header');
+            if (!icon || !btn) return;
+            if (status === 'loading') {
+                icon.className = "fa-solid fa-arrows-rotate fa-spin text-yellow-400";
+                if (label) label.innerText = teks || "Sync...";
+            } else if (status === 'ok') {
+                icon.className = "fa-solid fa-cloud-check text-emerald-400";
+                if (label) label.innerText = teks || "Tersinkron";
+            } else if (status === 'error') {
+                icon.className = "fa-solid fa-cloud-bolt text-red-400";
+                if (label) label.innerText = teks || "Cek URL";
+            } else {
+                icon.className = "fa-solid fa-cloud-arrow-down text-emerald-400";
+                if (label) label.innerText = teks || "Sync";
+            }
+        }
+
+        function sinkronPaksaSekarang() {
+            if (hasPendingCloudSave) {
+                backupToSpreadsheet(false);
+            } else {
+                muatDariSpreadsheet(false);
+            }
+        }
 
         function simpanLokal(skipCloud = false) {
             try {
                 lastSavedAt = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                if (!skipCloud) {
+                    lastLocalEditTimestamp = Date.now();
+                    hasPendingCloudSave = true;
+                }
                 const payload = {
+                    updatedAtMs: lastLocalEditTimestamp || Date.now(),
                     infoKlub,
                     dataAnggota,
                     dataProspek,
@@ -347,10 +387,11 @@
                 console.warn("Penyimpanan lokal penuh atau dibatasi:", e);
             }
             if (!skipCloud && autoSyncCloud && (GOOGLE_SCRIPT_URL || isRunningInGoogleAppsScript())) {
+                setIndikatorCloudHeader('loading', 'Menyimpan...');
                 if (autoSyncTimer) clearTimeout(autoSyncTimer);
                 autoSyncTimer = setTimeout(() => {
                     backupToSpreadsheet(true);
-                }, 700);
+                }, 200);
             }
         }
 
@@ -486,8 +527,8 @@
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
-                    const maxWidth = 500;
-                    const maxHeight = 500;
+                    const maxWidth = 340;
+                    const maxHeight = 340;
                     let width = img.width;
                     let height = img.height;
 
@@ -499,10 +540,10 @@
                         height = maxHeight;
                     }
 
-                    canvas.width = width;
-                    canvas.height = height;
-                    ctx.drawImage(img, 0, 0, width, height);
-                    callback(canvas.toDataURL('image/jpeg', 0.65));
+                    canvas.width = Math.round(width);
+                    canvas.height = Math.round(height);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    callback(canvas.toDataURL('image/jpeg', 0.55));
                 };
             };
         }
@@ -588,11 +629,16 @@
             return (typeof google !== "undefined" && google.script && google.script.run);
         }
 
-        // CLOUD SYNC (GOOGLE APPS SCRIPT - AUTO-SYNC HP & LAPTOP)
+        // CLOUD SYNC (GOOGLE APPS SCRIPT - AUTO-SYNC HP & LAPTOP DENGAN ANTREAN AMAN)
         async function backupToSpreadsheet(isSilentAuto = false) {
+            if (isSyncingToCloud) {
+                hasPendingCloudSave = true;
+                return;
+            }
             const dataToSave = {
                 action: 'save',
                 updatedAt: new Date().toISOString(),
+                updatedAtMs: Date.now(),
                 infoKlub,
                 dataAnggota,
                 dataProspek,
@@ -605,14 +651,22 @@
 
             // Jika berjalan langsung di dalam Index.html Google Apps Script
             if (isRunningInGoogleAppsScript()) {
+                isSyncingToCloud = true;
+                hasPendingCloudSave = false;
+                setIndikatorCloudHeader('loading', 'Menyimpan...');
                 if (!isSilentAuto) showToast("Menyimpan langsung ke Google Spreadsheet...");
                 google.script.run
                     .withSuccessHandler(() => {
-                        lastCloudSyncStatus = "Tersimpan di Sheet " + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                        isSyncingToCloud = false;
+                        lastCloudSyncStatus = "Tersimpan " + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                        setIndikatorCloudHeader('ok', 'Tersimpan');
                         simpanLokal(true);
-                        if (!isSilentAuto) showToast("Data berhasil disimpan ke Google Spreadsheet!");
+                        if (!isSilentAuto) showToast("Seluruh data berhasil disimpan ke Google Spreadsheet!");
+                        if (hasPendingCloudSave) backupToSpreadsheet(true);
                     })
                     .withFailureHandler((err) => {
+                        isSyncingToCloud = false;
+                        setIndikatorCloudHeader('error', 'Gagal');
                         console.error(err);
                         if (!isSilentAuto) showToast("Gagal menyimpan ke Spreadsheet.");
                     })
@@ -625,21 +679,32 @@
                 return;
             }
 
+            isSyncingToCloud = true;
+            hasPendingCloudSave = false;
+            setIndikatorCloudHeader('loading', 'Menyimpan...');
             if (!isSilentAuto) showToast("Menyimpan seluruh data ke Google Sheet...");
             try {
                 await fetch(GOOGLE_SCRIPT_URL, {
                     method: "POST",
                     mode: 'no-cors',
+                    cache: 'no-store',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify(dataToSave)
                 });
+                isSyncingToCloud = false;
                 lastCloudSyncStatus = "Cloud Tersinkron " + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                setIndikatorCloudHeader('ok', 'Tersimpan');
                 simpanLokal(true);
                 if (!isSilentAuto) {
-                    showToast("Data berhasil disimpan ke Google Spreadsheet!");
+                    showToast("Seluruh data berhasil disimpan ke Google Spreadsheet!");
                     if (activeTab === 'info') switchTab('info');
                 }
+                if (hasPendingCloudSave) {
+                    setTimeout(() => backupToSpreadsheet(true), 300);
+                }
             } catch (e) {
+                isSyncingToCloud = false;
+                setIndikatorCloudHeader('error', 'Gagal');
                 console.error(e);
                 if (!isSilentAuto) showToast("Gagal terhubung ke Cloud. Periksa URL Web App.");
             }
@@ -647,6 +712,7 @@
 
         function terapkanDataCloudKeAplikasi(textData, isSilentAuto = false) {
             if (!textData) {
+                setIndikatorCloudHeader('ok', 'Siap');
                 if (!isSilentAuto) backupToSpreadsheet(false);
                 return;
             }
@@ -661,24 +727,35 @@
                 adminPin = parsed.adminPin || adminPin;
                 nominalIuranWajib = parseInt(parsed.nominalIuranWajib) || nominalIuranWajib;
                 lastCloudSyncStatus = "Cloud Terhubung " + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                hasPendingCloudSave = false;
+                setIndikatorCloudHeader('ok', 'Terhubung');
                 normalisasiDataIuran();
                 simpanLokal(true);
                 renderHeaderInfo();
                 switchTab(activeTab);
                 if (!isSilentAuto) showToast("Data terbaru berhasil dimuat dari Google Spreadsheet!");
-            } else if (!isSilentAuto) {
-                backupToSpreadsheet(false);
+            } else {
+                setIndikatorCloudHeader('ok', 'Siap');
+                if (!isSilentAuto) {
+                    showToast("Cloud masih kosong, menyimpan data lokal ke Cloud...");
+                    backupToSpreadsheet(false);
+                }
             }
         }
 
         async function muatDariSpreadsheet(isSilentAuto = false) {
+            // Jangan menimpa perubahan lokal yang sedang dalam proses dikirim ke Cloud
+            if (isSyncingToCloud || (isSilentAuto && hasPendingCloudSave)) return;
+
             if (isRunningInGoogleAppsScript()) {
-                if (!isSilentAuto) showToast("Memuat data dari Google Spreadsheet...");
+                setIndikatorCloudHeader('loading', 'Memuat...');
+                if (!isSilentAuto) showToast("Memuat data terbaru dari Google Spreadsheet...");
                 google.script.run
                     .withSuccessHandler((rawJson) => {
                         try {
                             terapkanDataCloudKeAplikasi(rawJson, isSilentAuto);
                         } catch (e) {
+                            setIndikatorCloudHeader('error', 'Error');
                             console.error(e);
                         }
                     })
@@ -691,34 +768,18 @@
                 return;
             }
 
+            setIndikatorCloudHeader('loading', 'Memuat...');
             if (!isSilentAuto) showToast("Memuat data terbaru dari Google Sheet...");
             try {
                 let sep = GOOGLE_SCRIPT_URL.includes('?') ? '&' : '?';
-                let response = await fetch(GOOGLE_SCRIPT_URL + sep + "action=load&t=" + Date.now());
+                let response = await fetch(GOOGLE_SCRIPT_URL + sep + "action=load&t=" + Date.now(), {
+                    method: "GET",
+                    cache: "no-store"
+                });
                 let textData = await response.text();
-                if (textData) {
-                    let parsed = JSON.parse(textData);
-                    if (parsed && Array.isArray(parsed.dataAnggota)) {
-                        infoKlub = parsed.infoKlub || infoKlub;
-                        dataAnggota = parsed.dataAnggota || [];
-                        dataProspek = parsed.dataProspek || [];
-                        riwayatKeuangan = parsed.riwayatKeuangan || [];
-                        dataIuran = parsed.dataIuran || [];
-                        dataAgenda = parsed.dataAgenda || dataAgenda;
-                        adminPin = parsed.adminPin || adminPin;
-                        nominalIuranWajib = parseInt(parsed.nominalIuranWajib) || nominalIuranWajib;
-                        lastCloudSyncStatus = "Cloud Terhubung " + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-                        normalisasiDataIuran();
-                        simpanLokal(true);
-                        renderHeaderInfo();
-                        switchTab(activeTab);
-                        if (!isSilentAuto) showToast("Data terbaru berhasil dimuat dari Cloud!");
-                    } else if (!isSilentAuto) {
-                        showToast("Cloud masih kosong, menyimpan data lokal ke Cloud...");
-                        backupToSpreadsheet(false);
-                    }
-                }
+                terapkanDataCloudKeAplikasi(textData, isSilentAuto);
             } catch (e) {
+                setIndikatorCloudHeader('error', 'Cek URL');
                 console.error(e);
                 if (!isSilentAuto) showToast("Gagal memuat dari Cloud. Pastikan akses Web App: Anyone.");
             }
@@ -731,10 +792,16 @@
             simpanLokal(true);
             renderHeaderInfo();
             switchTab('dasbor');
-            // Jika berjalan di Google Apps Script atau URL Cloud sudah terpasang, otomatis ambil data terbaru
+            // Otomatis ambil data terbaru saat aplikasi dibuka di HP atau Laptop
             if (isRunningInGoogleAppsScript() || (GOOGLE_SCRIPT_URL && autoSyncCloud)) {
                 muatDariSpreadsheet(true);
             }
+            // Saat berpindah ke layar HP / tab browser ini kembali, otomatis segarkan data dari Cloud
+            document.addEventListener("visibilitychange", () => {
+                if (document.visibilityState === "visible" && (isRunningInGoogleAppsScript() || (GOOGLE_SCRIPT_URL && autoSyncCloud))) {
+                    muatDariSpreadsheet(true);
+                }
+            });
         };
 
         function renderHeaderInfo() {
@@ -2223,12 +2290,16 @@
         function getGoogleAppsScriptCode() {
             return `/**
  * ============================================================================
- * FILE 1: Kode.gs (Google Apps Script)
+ * FILE 1: Kode.gs (Google Apps Script - VERSI ANTI-LIMIT 50.000 KARAKTER)
  * Tempelkan seluruh kode ini di dalam file "Kode.gs" pada Google Apps Script.
+ * PENTING: Setelah menempelkan kode baru ini, klik:
+ * Terapkan (Deploy) > Kelola deployment (Manage deployments) > Edit (ikon pensil)
+ * > Pilih Versi: "Versi baru (New version)" > Klik Terapkan (Deploy).
  * ============================================================================
  */
 
 var BULAN_PENDEK = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
+var UKURAN_POTONGAN_MAKS = 40000; // Aman di bawah batas 50.000 karakter per sel Google Sheets
 
 /**
  * Jalankan fungsi ini 1 kali di Editor Apps Script (klik tombol "Jalankan" / "Run")
@@ -2255,13 +2326,26 @@ function simpanDataKMC(rawJsonString) {
 }
 
 /**
- * Fungsi native untuk memuat data langsung ke Index.html (via google.script.run)
+ * Fungsi native untuk memuat seluruh potongan data JSON dari _BackupJSON
  */
 function muatDataKMC() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var shBackup = ss.getSheetByName("_BackupJSON");
   if (!shBackup) return "";
-  return shBackup.getRange(2, 2).getValue() || "";
+
+  var lastRow = shBackup.getLastRow();
+  if (lastRow < 2) return "";
+
+  var values = shBackup.getRange(2, 1, lastRow - 1, 2).getValues();
+  var gabungJson = "";
+  for (var i = 0; i < values.length; i++) {
+    var label = String(values[i][0] || "");
+    var isi = String(values[i][1] || "");
+    if (label.indexOf("RAW_JSON") === 0 || label.indexOf("CHUNK_") === 0) {
+      gabungJson += isi;
+    }
+  }
+  return gabungJson;
 }
 
 /**
@@ -2306,7 +2390,7 @@ function doGet(e) {
       var rawFallback = muatDataKMC();
       return ContentService.createTextOutput(rawFallback || JSON.stringify({
         status: "ready",
-        message: "Kode.gs sudah aktif! Tambahkan file HTML bernama 'Index' di Apps Script untuk menampilkan aplikasi."
+        message: "Kode.gs aktif (Multi-Row Chunking)."
       })).setMimeType(ContentService.MimeType.JSON);
     }
   } catch (err) {
@@ -2316,23 +2400,38 @@ function doGet(e) {
 
 /**
  * Inti penyimpanan data ke seluruh Sheet Google Spreadsheet
+ * Menggunakan sistem Multi-Row Chunking agar tidak pernah terpotong batas 50.000 karakter/sel
  */
 function prosesSimpanKeSheet_(rawContents) {
   var lock = LockService.getScriptLock();
-  lock.tryLock(10000);
+  lock.waitLock(15000);
 
   try {
     var payload = JSON.parse(rawContents);
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var waktuSekarang = Utilities.formatDate(new Date(), "Asia/Makassar", "dd-MM-yyyy HH:mm:ss 'WITA'");
 
-    // 1. SIMPAN SNAPSHOT PENUH KE SHEET _BackupJSON
+    // 1. SIMPAN SNAPSHOT PENUH KE SHEET _BackupJSON (DIPECAH PER 40.000 KARAKTER AGAR TIDAK ERROR LIMIT SEL)
     var shBackup = getOrCreateSheet_(ss, "_BackupJSON");
     shBackup.clear();
-    shBackup.getRange(1, 1, 2, 2).setValues([
-      ["UPDATED_AT", waktuSekarang],
-      ["RAW_JSON", JSON.stringify(payload)]
-    ]);
+    var jsonStr = JSON.stringify(payload);
+    var totalPanjang = jsonStr.length;
+    var rowsBackup = [
+      ["UPDATED_AT", waktuSekarang]
+    ];
+
+    if (totalPanjang === 0) {
+      rowsBackup.push(["CHUNK_1", "{}"]);
+    } else {
+      var nomorPotongan = 1;
+      for (var pos = 0; pos < totalPanjang; pos += UKURAN_POTONGAN_MAKS) {
+        var potongan = jsonStr.substring(pos, pos + UKURAN_POTONGAN_MAKS);
+        rowsBackup.push(["CHUNK_" + nomorPotongan, potongan]);
+        nomorPotongan++;
+      }
+    }
+
+    shBackup.getRange(1, 1, rowsBackup.length, 2).setValues(rowsBackup);
     shBackup.hideSheet();
 
     // 2. TULIS SHEET PROFIL KLUB
@@ -2499,9 +2598,11 @@ function prosesSimpanKeSheet_(rawContents) {
     shAgenda.getRange(1, 1, rowsAgenda.length, rowsAgenda[0].length).setValues(rowsAgenda);
     formatTabelHeader_(shAgenda, rowsAgenda[0].length);
 
+    SpreadsheetApp.flush();
+
     return {
       status: "success",
-      message: "Data KMC berhasil disimpan ke Google Spreadsheet.",
+      message: "Seluruh data KMC (" + rowsBackup.length + " blok) berhasil disimpan ke Google Spreadsheet.",
       updatedAt: waktuSekarang
     };
   } finally {
