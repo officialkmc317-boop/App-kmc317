@@ -576,16 +576,23 @@
             document.getElementById('modal-login').classList.add('hidden');
         }
 
+        let pendingEditAnggotaIdx = null;
+
         function prosesLogin() {
             const pin = document.getElementById('input-pin').value;
             if (pin === adminPin) {
                 isAdmin = true;
                 updateStatusAdminUI();
                 tutupModalLogin();
-                showToast("Mode Admin aktif!");
+                showToast("Disetujui Admin! Mode Admin aktif.");
                 switchTab(activeTab);
+                if (pendingEditAnggotaIdx !== null) {
+                    const targetIdx = pendingEditAnggotaIdx;
+                    pendingEditAnggotaIdx = null;
+                    bukaFormAnggota(targetIdx);
+                }
             } else {
-                showToast("PIN yang Anda masukkan salah!");
+                showToast("PIN Admin yang dimasukkan salah!");
                 document.getElementById('input-pin').value = '';
             }
         }
@@ -1144,7 +1151,7 @@
                     <div class="flex justify-between items-center mb-3">
                         <div>
                             <h2 class="font-bold text-gray-800 text-base"><i class="fa-solid fa-id-card text-yellow-500 mr-2"></i>Data Anggota & KTA</h2>
-                            <p class="text-[10px] text-gray-500">Klik tombol KTA untuk melihat/mencetak Kartu Anggota Digital.</p>
+                            <p class="text-[10px] text-gray-500">Klik nama anggota untuk lihat Biodata Lengkap, atau tombol KTA.</p>
                         </div>
                         ${isAdmin ? `<button onclick="bukaFormAnggota()" class="bg-gray-900 hover:bg-gray-800 text-white text-[10px] font-bold px-3 py-2 rounded-xl shadow-md transition flex items-center shrink-0"><i class="fa-solid fa-plus mr-1.5"></i>Tambah</button>` : ''}
                     </div>
@@ -1192,25 +1199,26 @@
                 return `
                 <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-gray-100 mb-3 hover:border-yellow-300 transition space-y-2.5">
                     <div class="flex items-center">
-                        <div class="relative shrink-0">
-                            <img src="${a.foto || DEFAULT_AVATAR_URI}" class="w-14 h-14 rounded-xl object-cover bg-gray-800 border border-gray-200" onerror="this.src='${DEFAULT_AVATAR_URI}'">
+                        <div onclick="bukaModalBiodata(${idx})" class="relative shrink-0 cursor-pointer" title="Klik untuk melihat Biodata Lengkap ${a.nama}">
+                            <img src="${a.foto || DEFAULT_AVATAR_URI}" class="w-14 h-14 rounded-xl object-cover bg-gray-800 border border-gray-200 hover:opacity-90 transition" onerror="this.src='${DEFAULT_AVATAR_URI}'">
                             <img src="${a.fotoMotor || DEFAULT_MOTOR_URI}" title="Foto Motor: ${a.motor || '-'}" class="w-7 h-5 rounded object-cover border border-yellow-400 bg-slate-900 absolute -bottom-1 -right-1 shadow" onerror="this.src='${DEFAULT_MOTOR_URI}'">
                         </div>
-                        <div class="ml-3 flex-1 min-w-0">
+                        <div onclick="bukaModalBiodata(${idx})" class="ml-3 flex-1 min-w-0 cursor-pointer group" title="Klik nama untuk melihat Biodata Lengkap">
                             <div class="flex justify-between items-start">
-                                <h4 class="font-bold text-gray-800 text-sm truncate pr-2">${a.nama}</h4>
+                                <h4 class="font-bold text-gray-800 group-hover:text-yellow-600 group-hover:underline text-sm truncate pr-2 flex items-center">${a.nama} <i class="fa-solid fa-circle-info text-[10px] text-gray-400 group-hover:text-yellow-500 ml-1.5"></i></h4>
                                 <span class="bg-gray-900 text-yellow-400 text-[9px] px-2 py-0.5 rounded-full font-extrabold whitespace-nowrap">${a.id}</span>
                             </div>
                             <p class="text-[10px] text-yellow-600 font-bold mt-0.5"><i class="fa-solid fa-crown text-[8px] mr-1"></i>${a.jabatan}</p>
                             <p class="text-[10px] text-gray-500 mt-0.5 truncate"><i class="fa-solid fa-motorcycle w-3 text-center mr-1"></i>${a.motor || '-'} ${a.nopol ? `<span class="bg-gray-100 text-gray-700 font-mono px-1.5 py-0.2 rounded border border-gray-200 ml-1">${a.nopol}</span>` : ''}</p>
+                            <p class="text-[9px] text-blue-600 font-medium mt-0.5"><i class="fa-regular fa-address-card mr-1"></i>Ketuk nama untuk lihat biodata lengkap</p>
                         </div>
                         <div class="flex flex-col space-y-1.5 ml-2 shrink-0">
-                            <button onclick="bukaModalKTA(${idx})" class="px-2.5 h-7 bg-yellow-400 hover:bg-yellow-500 text-gray-900 rounded-lg text-[10px] font-extrabold transition flex items-center justify-center shadow-sm" title="Lihat KTA Digital & Foto Motor">
+                            <button onclick="bukaModalKTA(${idx})" class="px-2.5 h-7 bg-yellow-400 hover:bg-yellow-500 text-gray-900 rounded-lg text-[10px] font-extrabold transition flex items-center justify-center shadow-sm" title="Lihat KTA Digital (Ukuran KTP)">
                                 <i class="fa-solid fa-id-card mr-1"></i>KTA
                             </button>
                             <div class="flex space-x-1">
-                                <button onclick="bukaFormAnggota(${idx})" class="w-7 h-7 bg-blue-50 text-blue-600 rounded-lg text-xs hover:bg-blue-100 transition" title="Edit Data & Foto Motor"><i class="fa-solid fa-pen"></i></button>
-                                ${isAdmin ? `<button onclick="hapusAnggota(${idx})" class="w-7 h-7 bg-red-50 text-red-500 rounded-lg text-xs hover:bg-red-100 transition"><i class="fa-solid fa-trash"></i></button>` : ''}
+                                ${isAdmin ? `<button onclick="bukaFormAnggota(${idx})" class="w-7 h-7 bg-blue-50 text-blue-600 rounded-lg text-xs hover:bg-blue-100 transition" title="Edit Data Anggota"><i class="fa-solid fa-pen"></i></button>` : ''}
+                                ${isAdmin ? `<button onclick="hapusAnggota(${idx})" class="w-7 h-7 bg-red-50 text-red-500 rounded-lg text-xs hover:bg-red-100 transition" title="Hapus Anggota"><i class="fa-solid fa-trash"></i></button>` : ''}
                             </div>
                         </div>
                     </div>
@@ -1228,6 +1236,125 @@
                     </div>
                 </div>`;
             }).join('');
+        }
+
+        function bukaModalBiodata(idx) {
+            let a = dataAnggota[idx];
+            if (!a) return;
+            let fotoSrc = a.foto || DEFAULT_AVATAR_URI;
+            let fotoMotorSrc = a.fotoMotor || DEFAULT_MOTOR_URI;
+            let payloadStr = getPayloadBarcodeAnggota(a);
+            let qrUri = buatQRCodeDataURI(payloadStr);
+            let barcodeSvg = buatBarcodeBatangSVG(`${a.id} • ${a.nopol || 'KMC'}`, 230, 40);
+
+            // Hitung status iuran tahun berjalan untuk biodata
+            let iurItem = dataIuran.find(i => i.id === a.id);
+            let arrThn = (iurItem && iurItem.bayar && iurItem.bayar[tahunAktifIuran]) ? iurItem.bayar[tahunAktifIuran] : buatArrayBulanKosong();
+            let totalBulanLunas = arrThn.filter(b => b && b.lunas).length;
+
+            let html = `
+            <div id="modal-biodata" class="absolute inset-0 z-[66] flex justify-center items-end sm:items-center bg-gray-900/75 backdrop-blur-sm sm:p-4 modal-overlay fade-in">
+                <div class="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-md overflow-hidden slide-in flex flex-col max-h-[94dvh]">
+                    <div class="bg-gradient-to-r from-gray-900 to-slate-800 text-white px-5 py-4 flex justify-between items-center shrink-0">
+                        <div class="flex items-center space-x-2.5">
+                            <div class="w-9 h-9 rounded-xl bg-yellow-500 text-gray-900 flex items-center justify-center font-black text-sm shadow">
+                                <i class="fa-solid fa-address-card"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-yellow-400 text-sm">Biodata Lengkap Anggota</h3>
+                                <p class="text-[10px] text-gray-300">${infoKlub.nama}</p>
+                            </div>
+                        </div>
+                        <button onclick="tutupModal('modal-biodata')" class="w-8 h-8 flex justify-center items-center rounded-full bg-gray-800 text-gray-300 hover:bg-gray-700 transition"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+
+                    <div class="p-5 overflow-y-auto space-y-4">
+                        <!-- Foto Pribadi & Foto Motor -->
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="bg-gray-50 border border-gray-200 rounded-2xl p-2.5 text-center">
+                                <p class="text-[9px] font-extrabold text-gray-500 uppercase mb-1.5"><i class="fa-solid fa-user mr-1 text-yellow-600"></i>Foto Pribadi</p>
+                                <img src="${fotoSrc}" onerror="this.src='${DEFAULT_AVATAR_URI}'" class="w-24 h-28 mx-auto rounded-xl object-cover border-2 border-yellow-400 bg-gray-800 shadow-sm">
+                            </div>
+                            <div class="bg-gray-50 border border-gray-200 rounded-2xl p-2.5 text-center">
+                                <p class="text-[9px] font-extrabold text-gray-500 uppercase mb-1.5"><i class="fa-solid fa-motorcycle mr-1 text-yellow-600"></i>Foto Unit Motor</p>
+                                <img src="${fotoMotorSrc}" onerror="this.src='${DEFAULT_MOTOR_URI}'" class="w-full h-28 mx-auto rounded-xl object-cover border-2 border-gray-800 bg-slate-900 shadow-sm">
+                            </div>
+                        </div>
+
+                        <!-- Rincian Data Biodata Anggota -->
+                        <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm space-y-2.5 text-xs">
+                            <div class="flex justify-between items-center border-b border-gray-100 pb-2">
+                                <span class="text-gray-500 font-medium">ID Anggota / No. Reg</span>
+                                <span class="bg-gray-900 text-yellow-400 font-mono font-extrabold px-2.5 py-0.5 rounded-lg text-[11px]">${a.id}</span>
+                            </div>
+                            <div class="flex justify-between items-start border-b border-gray-100 pb-2">
+                                <span class="text-gray-500 font-medium shrink-0">Nama Lengkap</span>
+                                <span class="font-extrabold text-gray-900 text-right ml-3">${a.nama}</span>
+                            </div>
+                            <div class="flex justify-between items-center border-b border-gray-100 pb-2">
+                                <span class="text-gray-500 font-medium">Jabatan</span>
+                                <span class="font-bold text-yellow-600 bg-yellow-50 px-2.5 py-0.5 rounded-lg border border-yellow-200">${a.jabatan}</span>
+                            </div>
+                            <div class="flex justify-between items-start border-b border-gray-100 pb-2">
+                                <span class="text-gray-500 font-medium shrink-0">Nomor Telepon / WA</span>
+                                <span class="font-bold text-gray-800 text-right ml-3">${a.hp || '-'}</span>
+                            </div>
+                            <div class="flex justify-between items-start border-b border-gray-100 pb-2">
+                                <span class="text-gray-500 font-medium shrink-0">Alamat Domisili</span>
+                                <span class="font-semibold text-gray-800 text-right ml-3">${a.alamat || '-'}</span>
+                            </div>
+                            <div class="flex justify-between items-start border-b border-gray-100 pb-2">
+                                <span class="text-gray-500 font-medium shrink-0">Tipe / Tahun Motor</span>
+                                <span class="font-bold text-gray-800 text-right ml-3">${a.motor || '-'}</span>
+                            </div>
+                            <div class="flex justify-between items-center border-b border-gray-100 pb-2">
+                                <span class="text-gray-500 font-medium">Nomor Polisi (Plat)</span>
+                                <span class="font-mono font-bold text-gray-900 bg-gray-100 px-2 py-0.5 rounded border border-gray-300">${a.nopol || '-'}</span>
+                            </div>
+                            <div class="flex justify-between items-center border-b border-gray-100 pb-2">
+                                <span class="text-gray-500 font-medium">Tanggal Bergabung</span>
+                                <span class="font-semibold text-gray-700">${formatTanggal(a.tglGabung || '2022-01-01')}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-500 font-medium">Iuran Tahun ${tahunAktifIuran}</span>
+                                <span class="font-bold text-emerald-600">${totalBulanLunas} / 12 Bulan Lunas</span>
+                            </div>
+                        </div>
+
+                        <!-- Barcode Keanggotaan di Biodata -->
+                        <div class="bg-gray-50 border border-gray-200 rounded-2xl p-3 flex items-center space-x-3">
+                            <img src="${qrUri}" class="w-16 h-16 rounded-lg border border-gray-200 bg-white p-1 shrink-0">
+                            <div class="flex-1 min-w-0">
+                                ${barcodeSvg}
+                                <p class="text-[9px] text-gray-500 text-center mt-1">Barcode Resmi Data Keanggotaan • ${a.id}</p>
+                            </div>
+                        </div>
+
+                        <div class="flex space-x-2">
+                            <button onclick="tutupModal('modal-biodata'); bukaModalKTA(${idx})" class="flex-1 bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-extrabold text-xs py-3 rounded-xl shadow transition flex items-center justify-center">
+                                <i class="fa-solid fa-id-card mr-1.5"></i> Lihat KTA (Ukuran KTP)
+                            </button>
+                            <button onclick="tutupModal('modal-biodata'); mintaPersetujuanEditKTA(${idx})" class="px-3.5 bg-gray-900 hover:bg-gray-800 text-white font-bold text-xs py-3 rounded-xl transition flex items-center justify-center">
+                                <i class="fa-solid ${isAdmin ? 'fa-pen' : 'fa-lock text-yellow-400'} mr-1.5"></i> Edit
+                            </button>
+                            <button onclick="tutupModal('modal-biodata')" class="px-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs py-3 rounded-xl transition">Tutup</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+            document.getElementById('dynamic-modal-container').innerHTML = html;
+        }
+
+        function mintaPersetujuanEditKTA(idx) {
+            if (isAdmin) {
+                tutupModal('modal-kta');
+                bukaFormAnggota(idx);
+            } else {
+                pendingEditAnggotaIdx = idx;
+                tutupModal('modal-kta');
+                showToast("Diperlukan persetujuan / PIN Admin untuk mengedit data KTA.");
+                bukaModalLogin();
+            }
         }
 
         function bukaModalBarcode(idx) {
@@ -1271,7 +1398,7 @@
 
                         <div class="flex space-x-2">
                             <button onclick="tutupModal('modal-barcode'); bukaModalKTA(${idx})" class="flex-1 bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-extrabold text-xs py-3 rounded-xl shadow transition">
-                                <i class="fa-solid fa-id-card mr-1.5"></i> Buka KTA & Foto Motor
+                                <i class="fa-solid fa-id-card mr-1.5"></i> Buka KTA (Ukuran KTP)
                             </button>
                             <button onclick="tutupModal('modal-barcode')" class="px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs py-3 rounded-xl transition">Tutup</button>
                         </div>
@@ -1282,6 +1409,7 @@
         }
 
         function gantiFotoMotorLangsung(event, idx) {
+            if (!cekAkses()) return;
             let file = event.target.files[0];
             if (file && dataAnggota[idx]) {
                 compressImage(file, (base64) => {
@@ -1302,78 +1430,96 @@
             let fotoMotorSrc = a.fotoMotor || DEFAULT_MOTOR_URI;
             let payloadStr = getPayloadBarcodeAnggota(a);
             let qrUri = buatQRCodeDataURI(payloadStr);
-            let barcodeSvg = buatBarcodeBatangSVG(`${a.id} • ${a.nopol || 'RX-KING'}`, 200, 36);
+            let barcodeSvg = buatBarcodeBatangSVG(`${a.id} • ${a.nopol || 'KMC'}`, 190, 30);
 
             let html = `
             <div id="modal-kta" class="absolute inset-0 z-[65] flex justify-center items-end sm:items-center bg-gray-900/75 backdrop-blur-sm sm:p-4 modal-overlay fade-in">
                 <div class="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-md overflow-hidden slide-in flex flex-col max-h-[94dvh]">
                     <div class="bg-gray-50 px-5 py-3.5 border-b border-gray-200 flex justify-between items-center shrink-0">
                         <div>
-                            <h3 class="font-bold text-gray-800 text-sm">Kartu Tanda Anggota (KTA) Digital</h3>
-                            <p class="text-[10px] text-gray-500">Dilengkapi Foto Unit Motor & Barcode Data Keanggotaan</p>
+                            <h3 class="font-bold text-gray-800 text-sm">KTA Digital (Ukuran Standar KTP / ID Card)</h3>
+                            <p class="text-[10px] text-gray-500">Dimensi Standar ISO ID-1 (85,6 mm × 54 mm)</p>
                         </div>
                         <button onclick="tutupModal('modal-kta')" class="w-8 h-8 flex justify-center items-center rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 transition"><i class="fa-solid fa-xmark"></i></button>
                     </div>
 
                     <div class="p-4 overflow-y-auto space-y-3.5">
-                        <!-- KTA CARD VISUAL -->
-                        <div class="bg-gradient-to-br from-gray-900 via-slate-900 to-neutral-900 rounded-2xl p-4 text-white shadow-xl border-2 border-yellow-500/80 relative overflow-hidden">
-                            <div class="absolute -right-8 -top-8 w-36 h-36 rounded-full bg-yellow-500/10 blur-xl pointer-events-none"></div>
-                            <div class="flex items-center justify-between border-b border-yellow-500/30 pb-2.5 mb-3">
-                                <div class="flex items-center space-x-2.5 min-w-0">
-                                    <img src="${logoSrc}" onerror="this.src='${DEFAULT_LOGO_URI}'" class="w-9 h-9 rounded-full object-cover border border-yellow-400 shrink-0">
+                        <!-- KTA CARD VISUAL UKURAN KTP (RASIO 85.6 : 54) -->
+                        <div class="w-full max-w-[365px] aspect-[85.6/54] mx-auto bg-gradient-to-br from-gray-900 via-slate-900 to-neutral-950 rounded-xl p-3 text-white shadow-2xl border-2 border-yellow-500/90 relative overflow-hidden flex flex-col justify-between">
+                            <div class="absolute -right-6 -top-6 w-28 h-28 rounded-full bg-yellow-500/10 blur-xl pointer-events-none"></div>
+
+                            <!-- HEADER KTA -->
+                            <div class="flex items-center justify-between border-b border-yellow-500/40 pb-1.5 shrink-0">
+                                <div class="flex items-center space-x-2 min-w-0">
+                                    <img src="${logoSrc}" onerror="this.src='${DEFAULT_LOGO_URI}'" class="w-7 h-7 rounded-full object-cover border border-yellow-400 shrink-0 bg-gray-800">
                                     <div class="min-w-0">
-                                        <h4 class="text-xs font-black tracking-wider text-yellow-400 uppercase truncate">${infoKlub.nama}</h4>
-                                        <p class="text-[9px] text-gray-300 italic truncate">${infoKlub.tagline}</p>
+                                        <h4 class="text-[10px] font-black tracking-wider text-yellow-400 uppercase truncate leading-tight">${infoKlub.nama}</h4>
+                                        <p class="text-[7.5px] text-gray-300 italic truncate leading-tight">${infoKlub.tagline}</p>
                                     </div>
                                 </div>
-                                <span class="bg-yellow-500 text-gray-900 text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider shrink-0">KTA RESMI</span>
-                            </div>
-
-                            <!-- PROFIL ANGGOTA -->
-                            <div class="flex items-center space-x-3">
-                                <img src="${fotoSrc}" onerror="this.src='${DEFAULT_AVATAR_URI}'" class="w-16 h-20 rounded-xl object-cover border-2 border-yellow-400 bg-gray-800 shrink-0 shadow-md">
-                                <div class="flex-1 min-w-0 space-y-0.5">
-                                    <div class="inline-block bg-gray-800 border border-yellow-500/40 text-yellow-400 font-mono text-[10px] font-extrabold px-2 py-0.5 rounded">${a.id}</div>
-                                    <h3 class="text-sm font-black text-white truncate">${a.nama}</h3>
-                                    <p class="text-[10px] text-yellow-300 font-semibold">${a.jabatan}</p>
-                                    <p class="text-[10px] text-gray-300 truncate"><i class="fa-solid fa-location-dot text-yellow-500 mr-1"></i>${a.alamat || '-'} • ${a.hp || '-'}</p>
+                                <div class="text-right shrink-0 ml-1">
+                                    <span class="bg-yellow-500 text-gray-950 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider block leading-none">KTA RESMI</span>
+                                    <span class="font-mono text-[8.5px] font-extrabold text-yellow-300 mt-0.5 block leading-none">${a.id}</span>
                                 </div>
                             </div>
 
-                            <!-- DATA & FOTO MOTOR DI DALAM KTA -->
-                            <div class="mt-3 bg-slate-800/90 border border-gray-700 rounded-xl p-2.5 flex items-center space-x-3">
-                                <label class="relative cursor-pointer group shrink-0" title="Klik untuk ganti Foto Motor">
-                                    <img src="${fotoMotorSrc}" onerror="this.src='${DEFAULT_MOTOR_URI}'" class="w-24 h-16 rounded-lg object-cover border border-yellow-400/80 bg-slate-950 group-hover:opacity-85 transition">
-                                    <span class="absolute bottom-1 right-1 bg-yellow-500 text-gray-900 rounded-md px-1.5 py-0.5 text-[8px] font-extrabold shadow flex items-center"><i class="fa-solid fa-camera mr-1"></i>Foto Motor</span>
-                                    <input type="file" class="hidden" accept="image/*" onchange="gantiFotoMotorLangsung(event, ${idx})">
-                                </label>
-                                <div class="flex-1 min-w-0 text-[10px] space-y-1">
-                                    <p class="text-[9px] font-extrabold text-yellow-400 uppercase tracking-wider"><i class="fa-solid fa-motorcycle mr-1"></i>Identitas Unit Motor</p>
-                                    <p class="text-white font-bold truncate">${a.motor || 'Yamaha RX-King'}</p>
-                                    <p class="text-gray-300">No. Polisi: <span class="font-mono font-bold text-yellow-300 bg-gray-900 px-1.5 py-0.5 rounded border border-gray-700">${a.nopol || '-'}</span></p>
-                                    <p class="text-[9px] text-gray-400">Bergabung: ${formatTanggal(a.tglGabung || '2022-01-01')}</p>
+                            <!-- ISI TENGAH KTA: FOTO PRIBADI + BIODATA + FOTO MOTOR -->
+                            <div class="flex items-center space-x-2.5 my-auto py-1">
+                                <!-- Foto Pribadi -->
+                                <div class="shrink-0 text-center">
+                                    <img src="${fotoSrc}" onerror="this.src='${DEFAULT_AVATAR_URI}'" class="w-14 h-[68px] rounded-lg object-cover border border-yellow-400 bg-gray-800 shadow">
+                                    <span class="text-[6.5px] text-gray-400 block mt-0.5 uppercase tracking-wider">Foto Pribadi</span>
+                                </div>
+
+                                <!-- Rincian Biodata KTA (Nama, Jabatan, No. Telp, Alamat, Unit Motor) -->
+                                <div class="flex-1 min-w-0 text-[8.5px] leading-snug space-y-0.5">
+                                    <div class="truncate"><span class="text-gray-400">Nama:</span> <strong class="text-white text-[9.5px] font-black uppercase">${a.nama}</strong></div>
+                                    <div class="truncate"><span class="text-gray-400">Jabatan:</span> <strong class="text-yellow-300 font-bold">${a.jabatan}</strong></div>
+                                    <div class="truncate"><span class="text-gray-400">Telp/WA:</span> <span class="text-gray-100 font-semibold">${a.hp || '-'}</span></div>
+                                    <div class="truncate"><span class="text-gray-400">Alamat:</span> <span class="text-gray-200">${a.alamat || '-'}</span></div>
+                                    <div class="truncate"><span class="text-gray-400">Motor:</span> <span class="text-yellow-200 font-semibold">${a.motor || '-'}</span> <span class="font-mono text-[8px] bg-gray-800 px-1 rounded text-yellow-400">${a.nopol || ''}</span></div>
+                                </div>
+
+                                <!-- Foto Motor -->
+                                <div class="shrink-0 text-center">
+                                    ${isAdmin ? `
+                                    <label class="relative cursor-pointer group block" title="Ganti Foto Motor (Mode Admin)">
+                                        <img src="${fotoMotorSrc}" onerror="this.src='${DEFAULT_MOTOR_URI}'" class="w-16 h-[52px] rounded-lg object-cover border border-yellow-400/80 bg-slate-950 shadow">
+                                        <span class="text-[6.5px] text-yellow-400 block mt-0.5 uppercase font-bold"><i class="fa-solid fa-camera mr-0.5"></i>Foto Motor</span>
+                                        <input type="file" class="hidden" accept="image/*" onchange="gantiFotoMotorLangsung(event, ${idx})">
+                                    </label>
+                                    ` : `
+                                    <div>
+                                        <img src="${fotoMotorSrc}" onerror="this.src='${DEFAULT_MOTOR_URI}'" class="w-16 h-[52px] rounded-lg object-cover border border-yellow-400/80 bg-slate-950 shadow">
+                                        <span class="text-[6.5px] text-gray-400 block mt-0.5 uppercase tracking-wider">Foto Motor</span>
+                                    </div>
+                                    `}
                                 </div>
                             </div>
 
-                            <!-- BARCODE & QR DATA KEANGGOTAAN DI KTA -->
-                            <div class="mt-3 pt-2.5 border-t border-gray-800 flex items-center justify-between gap-2 bg-gray-950/60 rounded-xl p-2">
-                                <img src="${qrUri}" alt="QR KTA" class="w-12 h-12 rounded bg-white p-0.5 shrink-0">
-                                <div class="flex-1 min-w-0">
-                                    ${barcodeSvg}
-                                    <p class="text-[8px] text-center text-gray-400 mt-0.5 truncate">Barcode Data Keanggotaan • ${a.id}</p>
+                            <!-- FOOTER KTA: BARCODE & QR DATA KEANGGOTAAN -->
+                            <div class="pt-1 border-t border-gray-800 flex items-center justify-between gap-2 bg-gray-950/80 rounded-lg px-2 py-1 shrink-0">
+                                <img src="${qrUri}" alt="QR KTA" class="w-8 h-8 rounded bg-white p-0.5 shrink-0">
+                                <div class="flex-1 min-w-0 overflow-hidden">
+                                    <div class="h-6 overflow-hidden flex items-center">${barcodeSvg}</div>
+                                </div>
+                                <div class="text-right shrink-0 text-[6.5px] text-gray-400 leading-tight">
+                                    <div class="text-yellow-400 font-bold">AKTIF</div>
+                                    <div>${formatTanggal(a.tglGabung || '2022-01-01')}</div>
                                 </div>
                             </div>
                         </div>
 
+                        <p class="text-[10px] text-center text-gray-500">Saat dicetak, kartu otomatis berukuran standar KTP (<strong>85,6 mm × 54 mm</strong>).</p>
+
                         <div class="flex space-x-2">
                             <button onclick="cetakKTA(${idx})" class="flex-1 bg-gray-900 hover:bg-gray-800 text-white font-bold text-xs py-3 rounded-xl shadow-md transition flex items-center justify-center">
-                                <i class="fa-solid fa-print mr-1.5 text-yellow-400"></i> Cetak KTA
+                                <i class="fa-solid fa-print mr-1.5 text-yellow-400"></i> Cetak KTA (Ukuran KTP)
                             </button>
-                            <button onclick="tutupModal('modal-kta'); bukaFormAnggota(${idx})" class="px-3.5 bg-yellow-100 hover:bg-yellow-200 text-yellow-900 font-bold text-xs py-3 rounded-xl transition flex items-center">
-                                <i class="fa-solid fa-pen mr-1"></i> Edit
+                            <button onclick="mintaPersetujuanEditKTA(${idx})" class="px-3.5 ${isAdmin ? 'bg-yellow-400 hover:bg-yellow-500 text-gray-900' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'} font-extrabold text-xs py-3 rounded-xl transition flex items-center" title="${isAdmin ? 'Edit Data KTA' : 'Memerlukan Persetujuan Admin'}">
+                                <i class="fa-solid ${isAdmin ? 'fa-pen' : 'fa-lock text-yellow-600'} mr-1.5"></i> Edit
                             </button>
-                            <button onclick="tutupModal('modal-kta')" class="px-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs py-3 rounded-xl transition">Tutup</button>
+                            <button onclick="tutupModal('modal-kta')" class="px-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs py-3 rounded-xl transition">Tutup</button>
                         </div>
                     </div>
                 </div>
@@ -1384,52 +1530,68 @@
         function cetakKTA(idx) {
             let a = dataAnggota[idx];
             if (!a) return;
+            let logoSrc = infoKlub.logo || DEFAULT_LOGO_URI;
             let fotoSrc = a.foto || DEFAULT_AVATAR_URI;
             let fotoMotorSrc = a.fotoMotor || DEFAULT_MOTOR_URI;
             let payloadStr = getPayloadBarcodeAnggota(a);
             let qrUri = buatQRCodeDataURI(payloadStr);
-            let barcodeSvg = buatBarcodeBatangSVG(`${a.id} - ${a.nopol || 'KMC'}`, 220, 38);
+            let barcodeSvg = buatBarcodeBatangSVG(`${a.id} - ${a.nopol || 'KMC'}`, 180, 28);
 
             document.getElementById('print-club-name').innerText = infoKlub.nama;
-            document.getElementById('print-club-tagline').innerText = "Kartu Tanda Anggota Resmi (Official Member Card)";
+            document.getElementById('print-club-tagline').innerText = "Cetak Kartu Tanda Anggota (Ukuran Standar KTP: 85,6 mm × 54 mm)";
             document.getElementById('print-date-now').innerText = new Date().toLocaleString('id-ID');
 
             let html = `
-                <div style="max-width:420px; margin:15px auto; border:2px solid #111827; border-radius:14px; padding:16px; font-family:sans-serif;">
-                    <div style="border-bottom:2px solid #eab308; padding-bottom:10px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
-                        <div>
-                            <div style="font-size:14px; font-weight:900; text-transform:uppercase;">${infoKlub.nama}</div>
-                            <div style="font-size:10px; color:#4b5563;">${infoKlub.tagline}</div>
+                <div style="display:flex; flex-direction:column; align-items:center; gap:14px; margin-top:10px;">
+                    <!-- KARTU KTA UKURAN KTP PRESISI (85.6mm x 54mm) -->
+                    <div style="width:85.6mm; height:54mm; box-sizing:border-box; border:1.5px solid #111827; border-radius:3.2mm; padding:2.5mm 3mm; font-family:'Inter',sans-serif; background:#0f172a; color:#ffffff; display:flex; flex-direction:column; justify-content:space-between; overflow:hidden; position:relative;">
+                        <!-- Header KTA -->
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eab308; padding-bottom:1.2mm;">
+                            <div style="display:flex; align-items:center; gap:2mm;">
+                                <img src="${logoSrc}" style="width:6.5mm; height:6.5mm; border-radius:50%; object-fit:cover; border:1px solid #facc15;">
+                                <div>
+                                    <div style="font-size:7.5pt; font-weight:900; color:#facc15; text-transform:uppercase; line-height:1.1;">${infoKlub.nama}</div>
+                                    <div style="font-size:5pt; color:#cbd5e1; font-style:italic; line-height:1.1;">${infoKlub.tagline}</div>
+                                </div>
+                            </div>
+                            <div style="text-align:right;">
+                                <div style="background:#eab308; color:#0f172a; font-weight:900; font-size:5pt; padding:0.5mm 1.5mm; border-radius:1mm; text-transform:uppercase;">KTA RESMI</div>
+                                <div style="font-family:monospace; font-size:6pt; font-weight:800; color:#fde047; margin-top:0.4mm;">${a.id}</div>
+                            </div>
                         </div>
-                        <div style="background:#eab308; color:#111; font-weight:800; font-size:10px; padding:3px 8px; border-radius:4px;">${a.id}</div>
-                    </div>
-                    <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px;">
-                        <img src="${fotoSrc}" style="width:70px; height:85px; object-fit:cover; border-radius:8px; border:2px solid #eab308;">
-                        <table style="flex:1; font-size:11px;">
-                            <tr><td style="padding:2px 0; color:#6b7280; width:38%;">Nama Anggota</td><td style="padding:2px 0; font-weight:700;">: ${a.nama}</td></tr>
-                            <tr><td style="padding:2px 0; color:#6b7280;">Jabatan</td><td style="padding:2px 0; font-weight:700;">: ${a.jabatan}</td></tr>
-                            <tr><td style="padding:2px 0; color:#6b7280;">Unit Motor</td><td style="padding:2px 0;">: ${a.motor || '-'}</td></tr>
-                            <tr><td style="padding:2px 0; color:#6b7280;">Nomor Polisi</td><td style="padding:2px 0; font-weight:700;">: ${a.nopol || '-'}</td></tr>
-                            <tr><td style="padding:2px 0; color:#6b7280;">No. WhatsApp</td><td style="padding:2px 0;">: ${a.hp || '-'}</td></tr>
-                            <tr><td style="padding:2px 0; color:#6b7280;">Domisili</td><td style="padding:2px 0;">: ${a.alamat || '-'}</td></tr>
-                        </table>
-                    </div>
-                    <div style="border:1px solid #cbd5e1; border-radius:10px; padding:8px; margin-bottom:12px; display:flex; align-items:center; gap:10px; background:#f8fafc;">
-                        <img src="${fotoMotorSrc}" style="width:95px; height:62px; object-fit:cover; border-radius:6px; border:1px solid #94a3b8;">
-                        <div style="font-size:10px;">
-                            <div style="font-weight:800; color:#0f172a; text-transform:uppercase;">Data Foto Unit Motor</div>
-                            <div>Tipe: <strong>${a.motor || '-'}</strong></div>
-                            <div>No. Polisi: <strong>${a.nopol || '-'}</strong></div>
-                            <div>Tgl Gabung: ${formatTanggal(a.tglGabung || '2022-01-01')}</div>
+
+                        <!-- Isi Tengah KTA: Foto Pribadi + Biodata + Foto Motor -->
+                        <div style="display:flex; align-items:center; gap:2.2mm; margin:auto 0;">
+                            <div style="text-align:center;">
+                                <img src="${fotoSrc}" style="width:14mm; height:17.5mm; object-fit:cover; border-radius:1.5mm; border:1px solid #facc15; background:#1e293b;">
+                                <div style="font-size:4.2pt; color:#94a3b8; margin-top:0.3mm;">FOTO PRIBADI</div>
+                            </div>
+                            <div style="flex:1; font-size:5.6pt; line-height:1.35; overflow:hidden;">
+                                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><span style="color:#94a3b8;">Nama:</span> <strong style="color:#ffffff; font-size:6.3pt; text-transform:uppercase;">${a.nama}</strong></div>
+                                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><span style="color:#94a3b8;">Jabatan:</span> <strong style="color:#fde047;">${a.jabatan}</strong></div>
+                                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><span style="color:#94a3b8;">No. Telp:</span> <strong>${a.hp || '-'}</strong></div>
+                                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><span style="color:#94a3b8;">Alamat:</span> ${a.alamat || '-'}</div>
+                                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><span style="color:#94a3b8;">Motor:</span> <strong style="color:#fef08a;">${a.motor || '-'}</strong> (${a.nopol || '-'})</div>
+                            </div>
+                            <div style="text-align:center;">
+                                <img src="${fotoMotorSrc}" style="width:17mm; height:14mm; object-fit:cover; border-radius:1.5mm; border:1px solid #facc15; background:#020617;">
+                                <div style="font-size:4.2pt; color:#facc15; margin-top:0.3mm; font-weight:700;">FOTO MOTOR</div>
+                            </div>
+                        </div>
+
+                        <!-- Footer Barcode & QR -->
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:2mm; border-top:0.5px solid #334155; padding-top:1mm; background:#020617; border-radius:1.5mm; padding:0.8mm 1.5mm;">
+                            <img src="${qrUri}" style="width:7.5mm; height:7.5mm; background:#ffffff; padding:0.3mm; border-radius:0.8mm;">
+                            <div style="flex:1; max-height:6.5mm; overflow:hidden; display:flex; align-items:center;">
+                                ${barcodeSvg}
+                            </div>
+                            <div style="text-align:right; font-size:4.5pt; color:#cbd5e1; line-height:1.2;">
+                                <div style="color:#4ade80; font-weight:800;">ANGGOTA AKTIF</div>
+                                <div>${formatTanggal(a.tglGabung || '2022-01-01')}</div>
+                            </div>
                         </div>
                     </div>
-                    <div style="display:flex; align-items:center; gap:10px; border-top:1px dashed #cbd5e1; padding-top:10px;">
-                        <img src="${qrUri}" style="width:54px; height:54px; border:1px solid #cbd5e1; border-radius:6px; padding:2px;">
-                        <div style="flex:1; text-align:center;">
-                            ${barcodeSvg}
-                            <div style="font-size:9px; color:#4b5563; margin-top:2px;">Barcode Resmi Data Keanggotaan ${infoKlub.nama}</div>
-                        </div>
-                    </div>
+                    <p style="font-size:9px; color:#6b7280; text-align:center;">Gunting mengikuti garis tepi kartu (Ukuran Standar KTP: 85,6 mm × 54 mm).</p>
                 </div>
             `;
             document.getElementById('print-content-body').innerHTML = html;
@@ -1437,7 +1599,7 @@
         }
 
         function bukaFormAnggota(idx = null) {
-            if (idx === null && !cekAkses()) return;
+            if (!cekAkses()) return;
 
             let isEdit = idx !== null;
             let today = new Date().toISOString().split('T')[0];
