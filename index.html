@@ -204,7 +204,7 @@
         };
 
         const DEFAULT_ANGGOTA = [
-            { id: "KMC-001", nama: "Rian Katuuk", jabatan: "Ketua Umum", motor: "RX-King Cobra 1994", nopol: "DB 2001 FK", hp: "081234567890", alamat: "Airmadidi, Minahasa Utara", tglGabung: "2021-03-14", foto: "" },
+            { id: "KMC-001", nama: "Rian Katuuk", jabatan: "Ketua", motor: "RX-King Cobra 1994", nopol: "DB 2001 FK", hp: "081234567890", alamat: "Airmadidi, Minahasa Utara", tglGabung: "2021-03-14", foto: "" },
             { id: "KMC-002", nama: "Ferry Wowor", jabatan: "Bendahara", motor: "RX-King Master 2004", nopol: "DB 4512 FW", hp: "082345678901", alamat: "Kauditan, Minahasa Utara", tglGabung: "2021-05-20", foto: "" },
             { id: "KMC-003", nama: "Dion Maramis", jabatan: "Sekretaris", motor: "RX-King New 2008", nopol: "DB 3199 DM", hp: "085240112233", alamat: "Kalawat, Minahasa Utara", tglGabung: "2022-01-10", foto: "" },
             { id: "KMC-004", nama: "Kevin Tumbel", jabatan: "Humas", motor: "RX-King Special 1997", nopol: "DB 5880 KT", hp: "081355667788", alamat: "Dimembe, Minahasa Utara", tglGabung: "2022-08-17", foto: "" }
@@ -429,8 +429,9 @@
         }
 
         function normalisasiDataIuran() {
-            // Sinkronisasi Anggota ke Data Iuran
+            // Normalisasi jabatan lama "Ketua Umum" menjadi "Ketua" & sinkronisasi ke Data Iuran
             dataAnggota.forEach(ag => {
+                if (ag.jabatan === "Ketua Umum") ag.jabatan = "Ketua";
                 let existing = dataIuran.find(i => i.id === ag.id);
                 if (!existing) {
                     dataIuran.push({ id: ag.id, nama: ag.nama, bayar: {} });
@@ -737,8 +738,7 @@
             } else {
                 setIndikatorCloudHeader('ok', 'Siap');
                 if (!isSilentAuto) {
-                    showToast("Cloud masih kosong, menyimpan data lokal ke Cloud...");
-                    backupToSpreadsheet(false);
+                    showToast("Belum ada data di Cloud. Klik tombol Backup jika ingin mengirim data dari perangkat ini.");
                 }
             }
         }
@@ -1486,7 +1486,8 @@
                                 <label class="block text-[10px] font-bold text-gray-500 mb-1">Jabatan</label>
                                 <select id="f_jabatan" class="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-yellow-500 outline-none">
                                     <option value="Anggota" ${data.jabatan === 'Anggota' ? 'selected' : ''}>Anggota</option>
-                                    <option value="Ketua Umum" ${data.jabatan === 'Ketua Umum' ? 'selected' : ''}>Ketua Umum</option>
+                                    <option value="Penasehat" ${data.jabatan === 'Penasehat' ? 'selected' : ''}>Penasehat</option>
+                                    <option value="Ketua" ${(data.jabatan === 'Ketua' || data.jabatan === 'Ketua Umum') ? 'selected' : ''}>Ketua</option>
                                     <option value="Wakil Ketua" ${data.jabatan === 'Wakil Ketua' ? 'selected' : ''}>Wakil Ketua</option>
                                     <option value="Sekretaris" ${data.jabatan === 'Sekretaris' ? 'selected' : ''}>Sekretaris</option>
                                     <option value="Bendahara" ${data.jabatan === 'Bendahara' ? 'selected' : ''}>Bendahara</option>
@@ -2290,21 +2291,20 @@
         function getGoogleAppsScriptCode() {
             return `/**
  * ============================================================================
- * FILE 1: Kode.gs (Google Apps Script - VERSI ANTI-LIMIT 50.000 KARAKTER)
+ * FILE 1: Kode.gs (Google Apps Script - FITUR PEMULIHAN OTOMATIS DARI TABEL SHEET)
  * Tempelkan seluruh kode ini di dalam file "Kode.gs" pada Google Apps Script.
- * PENTING: Setelah menempelkan kode baru ini, klik:
- * Terapkan (Deploy) > Kelola deployment (Manage deployments) > Edit (ikon pensil)
- * > Pilih Versi: "Versi baru (New version)" > Klik Terapkan (Deploy).
+ *
+ * Keunggulan Versi Ini:
+ * - Otomatis membaca data langsung dari tabel sheet (Anggota, Prospek, Keuangan,
+ *   Rekap_Iuran, Agenda, Profil_Klub) apabila _BackupJSON kosong/terpotong,
+ *   sehingga data yang sudah terinput di Spreadsheet TIDAK AKAN HILANG saat
+ *   file HTML di-update!
  * ============================================================================
  */
 
 var BULAN_PENDEK = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
-var UKURAN_POTONGAN_MAKS = 40000; // Aman di bawah batas 50.000 karakter per sel Google Sheets
+var UKURAN_POTONGAN_MAKS = 40000;
 
-/**
- * Jalankan fungsi ini 1 kali di Editor Apps Script (klik tombol "Jalankan" / "Run")
- * untuk memberikan izin akses (Review Permissions) dan membuat seluruh tab Sheet.
- */
 function setupSpreadsheetAwal() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var daftarSheet = ["Profil_Klub", "Anggota", "Prospek", "Keuangan", "Rekap_Iuran", "Agenda", "_BackupJSON"];
@@ -2318,39 +2318,243 @@ function setupSpreadsheetAwal() {
   Logger.log("Inisialisasi Spreadsheet KMC selesai pada: " + ss.getUrl());
 }
 
-/**
- * Fungsi native untuk menyimpan data langsung dari Index.html (via google.script.run)
- */
 function simpanDataKMC(rawJsonString) {
   return prosesSimpanKeSheet_(rawJsonString);
 }
 
 /**
- * Fungsi native untuk memuat seluruh potongan data JSON dari _BackupJSON
+ * Memuat data KMC: menggabungkan snapshot _BackupJSON (untuk foto/bukti)
+ * dengan baris-baris tabel di Sheet (Anggota, Keuangan, Prospek, Iuran, Agenda)
+ * agar data di Spreadsheet selalu kembali utuh ke HP & Laptop.
  */
 function muatDataKMC() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var shBackup = ss.getSheetByName("_BackupJSON");
-  if (!shBackup) return "";
+  var parsedBackup = null;
 
-  var lastRow = shBackup.getLastRow();
-  if (lastRow < 2) return "";
-
-  var values = shBackup.getRange(2, 1, lastRow - 1, 2).getValues();
-  var gabungJson = "";
-  for (var i = 0; i < values.length; i++) {
-    var label = String(values[i][0] || "");
-    var isi = String(values[i][1] || "");
-    if (label.indexOf("RAW_JSON") === 0 || label.indexOf("CHUNK_") === 0) {
-      gabungJson += isi;
+  if (shBackup && shBackup.getLastRow() >= 2) {
+    try {
+      var lastRow = shBackup.getLastRow();
+      var values = shBackup.getRange(2, 1, lastRow - 1, 2).getValues();
+      var gabungJson = "";
+      for (var i = 0; i < values.length; i++) {
+        var label = String(values[i][0] || "");
+        var isi = String(values[i][1] || "");
+        if (label.indexOf("RAW_JSON") === 0 || label.indexOf("CHUNK_") === 0) {
+          gabungJson += isi;
+        }
+      }
+      if (gabungJson) {
+        parsedBackup = JSON.parse(gabungJson);
+      }
+    } catch (e) {
+      parsedBackup = null;
     }
   }
-  return gabungJson;
+
+  // Baca juga langsung dari tabel-tabel Sheet yang terlihat (Anggota, Keuangan, dll.)
+  var dataDariTabel = bangunDataDariTabelSheet_(ss, parsedBackup);
+  if (dataDariTabel) {
+    return JSON.stringify(dataDariTabel);
+  }
+
+  if (parsedBackup) {
+    return JSON.stringify(parsedBackup);
+  }
+  return "";
 }
 
 /**
- * Menangani permintaan Backup Data (POST) via fetch URL Web App
+ * Membaca data langsung dari Sheet Anggota, Prospek, Keuangan, Rekap_Iuran, Agenda, Profil_Klub
+ * dan memertahankan foto/bukti transfer dari backup jika ada.
  */
+function bangunDataDariTabelSheet_(ss, backupLama) {
+  var shAnggota = ss.getSheetByName("Anggota");
+  var shKeuangan = ss.getSheetByName("Keuangan");
+  var shProspek = ss.getSheetByName("Prospek");
+  var shAgenda = ss.getSheetByName("Agenda");
+  var shIuran = ss.getSheetByName("Rekap_Iuran");
+  var shProfil = ss.getSheetByName("Profil_Klub");
+
+  var hasil = backupLama ? JSON.parse(JSON.stringify(backupLama)) : {};
+
+  // Petakan foto lama berdasarkan ID anggota agar foto profil & foto motor tidak hilang
+  var petaFotoAnggota = {};
+  if (hasil.dataAnggota && Array.isArray(hasil.dataAnggota)) {
+    hasil.dataAnggota.forEach(function (a) {
+      if (a && a.id) {
+        petaFotoAnggota[String(a.id).trim()] = {
+          foto: a.foto || "",
+          fotoMotor: a.fotoMotor || ""
+        };
+      }
+    });
+  }
+
+  // 1. Pulihkan Profil Klub dari Sheet Profil_Klub
+  if (shProfil && shProfil.getLastRow() >= 5) {
+    var valP = shProfil.getRange(2, 1, shProfil.getLastRow() - 1, 2).getValues();
+    if (!hasil.infoKlub) hasil.infoKlub = {};
+    valP.forEach(function (r) {
+      var k = String(r[0] || "").trim();
+      var v = r[1];
+      if (k === "Nama Komunitas" && v) hasil.infoKlub.nama = String(v);
+      if (k === "Tagline / Slogan" && v) hasil.infoKlub.tagline = String(v);
+      if (k === "Deskripsi" && v) hasil.infoKlub.keterangan = String(v);
+      if (k.indexOf("Nominal Iuran") === 0 && v) hasil.nominalIuranWajib = Number(v) || 25000;
+    });
+  }
+
+  // 2. Pulihkan Daftar Anggota dari Sheet Anggota
+  if (shAnggota && shAnggota.getLastRow() >= 2) {
+    var rowsA = shAnggota.getRange(2, 1, shAnggota.getLastRow() - 1, 9).getDisplayValues();
+    var listAnggota = [];
+    rowsA.forEach(function (r) {
+      var id = String(r[1] || "").trim();
+      var nama = String(r[2] || "").trim();
+      if (id || nama) {
+        var idFinal = id || ("KMC-" + String(listAnggota.length + 1).padStart(3, "0"));
+        var fotoersimpan = petaFotoAnggota[idFinal] || {};
+        listAnggota.push({
+          id: idFinal,
+          nama: nama,
+          jabatan: String(r[3] || "Anggota").trim(),
+          motor: String(r[4] || "").trim(),
+          nopol: String(r[5] || "").trim() === "-" ? "" : String(r[5] || "").trim(),
+          hp: String(r[6] || "").replace(/^'/, "").trim(),
+          alamat: String(r[7] || "").trim(),
+          tglGabung: String(r[8] || "").trim(),
+          foto: fotoersimpan.foto || "",
+          fotoMotor: fotoersimpan.fotoMotor || ""
+        });
+      }
+    });
+    if (listAnggota.length > 0) {
+      hasil.dataAnggota = listAnggota;
+    }
+  }
+
+  // 3. Pulihkan Daftar Prospek dari Sheet Prospek
+  if (shProspek && shProspek.getLastRow() >= 2) {
+    var rowsP = shProspek.getRange(2, 1, shProspek.getLastRow() - 1, 7).getDisplayValues();
+    var listProspek = [];
+    rowsP.forEach(function (r) {
+      var id = String(r[1] || "").trim();
+      var nama = String(r[2] || "").trim();
+      if (id || nama) {
+        listProspek.push({
+          id: id || ("PRO-" + String(listProspek.length + 1).padStart(2, "0")),
+          nama: nama,
+          motor: String(r[3] || "").trim(),
+          nopol: String(r[4] || "").trim() === "-" ? "" : String(r[4] || "").trim(),
+          hp: String(r[5] || "").replace(/^'/, "").trim(),
+          alamat: String(r[6] || "").trim(),
+          foto: ""
+        });
+      }
+    });
+    hasil.dataProspek = listProspek;
+  }
+
+  // 4. Pulihkan Riwayat Keuangan dari Sheet Keuangan
+  if (shKeuangan && shKeuangan.getLastRow() >= 2) {
+    var rowsK = shKeuangan.getRange(2, 1, shKeuangan.getLastRow() - 1, 6).getValues();
+    var listKas = [];
+    rowsK.forEach(function (r, idx) {
+      var ket = String(r[2] || "").trim();
+      if (!ket || ket === "TOTAL MUTASI KAS" || ket === "SALDO KAS AKHIR (RP)") return;
+      var tglRaw = r[1];
+      var tglStr = "";
+      if (tglRaw instanceof Date) {
+        tglStr = Utilities.formatDate(tglRaw, "Asia/Makassar", "yyyy-MM-dd");
+      } else {
+        tglStr = String(tglRaw || "").trim();
+      }
+      var jenisRaw = String(r[3] || "").toLowerCase();
+      var masukVal = Number(String(r[4] || "0").replace(/[^0-9.-]+/g, "")) || 0;
+      var keluarVal = Number(String(r[5] || "0").replace(/[^0-9.-]+/g, "")) || 0;
+      var isMasuk = jenisRaw.indexOf("masuk") !== -1 || (masukVal > 0 && keluarVal === 0);
+      var nominal = isMasuk ? masukVal : keluarVal;
+      if (nominal > 0) {
+        listKas.push({
+          id: Number(r[0]) || (idx + 1),
+          tgl: tglStr,
+          ket: ket,
+          jenis: isMasuk ? "masuk" : "keluar",
+          nominal: nominal
+        });
+      }
+    });
+    if (listKas.length > 0) {
+      hasil.riwayatKeuangan = listKas;
+    }
+  }
+
+  // 5. Pulihkan Rekap Iuran dari Sheet Rekap_Iuran
+  if (shIuran && shIuran.getLastRow() >= 2) {
+    var rowsI = shIuran.getRange(2, 1, shIuran.getLastRow() - 1, 15).getDisplayValues();
+    var petaIuranLama = {};
+    if (hasil.dataIuran && Array.isArray(hasil.dataIuran)) {
+      hasil.dataIuran.forEach(function (item) {
+        if (item && item.id) petaIuranLama[String(item.id).trim()] = item;
+      });
+    }
+    var listIuran = [];
+    rowsI.forEach(function (r) {
+      var idAg = String(r[0] || "").trim();
+      var namaAg = String(r[1] || "").trim();
+      var thn = String(r[2] || new Date().getFullYear()).trim();
+      if (!idAg && !namaAg) return;
+      var itemIur = petaIuranLama[idAg] || { id: idAg, nama: namaAg, bayar: {} };
+      itemIur.nama = namaAg || itemIur.nama;
+      if (!itemIur.bayar) itemIur.bayar = {};
+      var bulanLama = itemIur.bayar[thn] || [];
+      var bulanBaru = [];
+      for (var m = 0; m < 12; m++) {
+        var st = String(r[3 + m] || "").toUpperCase().trim();
+        var buktiLama = (bulanLama[m] && typeof bulanLama[m] === "object") ? (bulanLama[m].bukti || "") : "";
+        bulanBaru.push({
+          lunas: st === "LUNAS" || st === "✔" || st === "TRUE",
+          bukti: buktiLama
+        });
+      }
+      itemIur.bayar[thn] = bulanBaru;
+      listIuran.push(itemIur);
+    });
+    if (listIuran.length > 0) {
+      hasil.dataIuran = listIuran;
+    }
+  }
+
+  // 6. Pulihkan Agenda dari Sheet Agenda
+  if (shAgenda && shAgenda.getLastRow() >= 2) {
+    var rowsG = shAgenda.getRange(2, 1, shAgenda.getLastRow() - 1, 8).getDisplayValues();
+    var listAgenda = [];
+    rowsG.forEach(function (r, idx) {
+      var judul = String(r[3] || "").trim();
+      if (judul) {
+        listAgenda.push({
+          id: String(r[1] || ("AGD-" + (idx + 1))).trim(),
+          kategori: String(r[2] || "Kopdar").trim(),
+          judul: judul,
+          tgl: String(r[4] || "").trim(),
+          waktu: String(r[5] || "").trim(),
+          lokasi: String(r[6] || "").trim(),
+          ket: String(r[7] || "").trim()
+        });
+      }
+    });
+    if (listAgenda.length > 0) {
+      hasil.dataAgenda = listAgenda;
+    }
+  }
+
+  if (hasil.dataAnggota && Array.isArray(hasil.dataAnggota) && hasil.dataAnggota.length > 0) {
+    return hasil;
+  }
+  return backupLama;
+}
+
 function doPost(e) {
   try {
     if (!e || !e.postData || !e.postData.contents) {
@@ -2363,24 +2567,19 @@ function doPost(e) {
   }
 }
 
-/**
- * Menangani pembukaan Aplikasi Web (GET) di HP & Laptop atau permintaan ?action=load
- */
 function doGet(e) {
   try {
     var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : "";
 
-    // Jika diminta data JSON (?action=load)
     if (action === "load") {
       var rawJson = muatDataKMC();
       if (!rawJson) {
-        return buatResponsJSON_({ status: "empty", message: "Belum ada data backup." });
+        return buatResponsJSON_({ status: "empty", message: "Belum ada data di Spreadsheet." });
       }
       return ContentService.createTextOutput(rawJson)
         .setMimeType(ContentService.MimeType.JSON);
     }
 
-    // Buka halaman aplikasi Index.html secara langsung saat link /exec diakses di HP / Laptop
     try {
       return HtmlService.createHtmlOutputFromFile("Index")
         .setTitle("Manajemen King Minut Community")
@@ -2390,7 +2589,7 @@ function doGet(e) {
       var rawFallback = muatDataKMC();
       return ContentService.createTextOutput(rawFallback || JSON.stringify({
         status: "ready",
-        message: "Kode.gs aktif (Multi-Row Chunking)."
+        message: "Kode.gs aktif (Pemulihan Otomatis dari Tabel Sheet)."
       })).setMimeType(ContentService.MimeType.JSON);
     }
   } catch (err) {
@@ -2398,10 +2597,6 @@ function doGet(e) {
   }
 }
 
-/**
- * Inti penyimpanan data ke seluruh Sheet Google Spreadsheet
- * Menggunakan sistem Multi-Row Chunking agar tidak pernah terpotong batas 50.000 karakter/sel
- */
 function prosesSimpanKeSheet_(rawContents) {
   var lock = LockService.getScriptLock();
   lock.waitLock(15000);
@@ -2411,7 +2606,7 @@ function prosesSimpanKeSheet_(rawContents) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var waktuSekarang = Utilities.formatDate(new Date(), "Asia/Makassar", "dd-MM-yyyy HH:mm:ss 'WITA'");
 
-    // 1. SIMPAN SNAPSHOT PENUH KE SHEET _BackupJSON (DIPECAH PER 40.000 KARAKTER AGAR TIDAK ERROR LIMIT SEL)
+    // 1. SIMPAN SNAPSHOT PENUH KE SHEET _BackupJSON (DIPECAH PER 40.000 KARAKTER)
     var shBackup = getOrCreateSheet_(ss, "_BackupJSON");
     shBackup.clear();
     var jsonStr = JSON.stringify(payload);
@@ -2602,7 +2797,7 @@ function prosesSimpanKeSheet_(rawContents) {
 
     return {
       status: "success",
-      message: "Seluruh data KMC (" + rowsBackup.length + " blok) berhasil disimpan ke Google Spreadsheet.",
+      message: "Data KMC berhasil disimpan ke Google Spreadsheet.",
       updatedAt: waktuSekarang
     };
   } finally {
@@ -2701,15 +2896,21 @@ function buatResponsJSON_(obj) {
                             <p class="text-[9px] text-emerald-800 leading-relaxed">Cukup klik salah satu tombol di atas lalu kirim ke WhatsApp Anda. Saat dibuka di HP/Laptop, data otomatis langsung tersambung.</p>
                         </div>
 
-                        <!-- Cadangan File JSON untuk Pindah Data Instan via WhatsApp/File -->
-                        <div class="pt-2 border-t border-blue-200/70 flex space-x-2">
-                            <button onclick="eksporJSONLokal()" class="flex-1 bg-white hover:bg-gray-50 text-gray-700 border border-blue-200 font-bold text-[10px] py-2 rounded-xl transition flex items-center justify-center">
-                                <i class="fa-solid fa-file-export mr-1.5 text-blue-600"></i> Simpan File Cadangan (.json)
-                            </button>
-                            <label class="flex-1 bg-white hover:bg-gray-50 text-gray-700 border border-blue-200 font-bold text-[10px] py-2 rounded-xl transition flex items-center justify-center cursor-pointer">
-                                <i class="fa-solid fa-file-import mr-1.5 text-emerald-600"></i> Muat File (.json)
-                                <input type="file" accept=".json,application/json" class="hidden" onchange="imporJSONLokal(event)">
+                        <!-- Pemulihan Data dari File Spreadsheet (.xlsx) atau Cadangan (.json) -->
+                        <div class="pt-2 border-t border-blue-200/70 space-y-2">
+                            <label class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] py-2.5 px-3 rounded-xl shadow-sm transition flex items-center justify-center cursor-pointer">
+                                <i class="fa-solid fa-file-excel mr-1.5 text-yellow-300 text-sm"></i> Pulihkan Data dari File Spreadsheet (.xlsx)
+                                <input type="file" accept=".xlsx,.xls" class="hidden" onchange="imporDariExcel(event)">
                             </label>
+                            <div class="flex space-x-2">
+                                <button onclick="eksporJSONLokal()" class="flex-1 bg-white hover:bg-gray-50 text-gray-700 border border-blue-200 font-bold text-[10px] py-2 rounded-xl transition flex items-center justify-center">
+                                    <i class="fa-solid fa-file-export mr-1.5 text-blue-600"></i> Simpan Cadangan (.json)
+                                </button>
+                                <label class="flex-1 bg-white hover:bg-gray-50 text-gray-700 border border-blue-200 font-bold text-[10px] py-2 rounded-xl transition flex items-center justify-center cursor-pointer">
+                                    <i class="fa-solid fa-file-import mr-1.5 text-emerald-600"></i> Muat File (.json)
+                                    <input type="file" accept=".json,application/json" class="hidden" onchange="imporJSONLokal(event)">
+                                </label>
+                            </div>
                         </div>
                     </div>
 
@@ -3084,8 +3285,8 @@ function buatResponsJSON_(obj) {
             simpanLokal(true);
             switchTab('info');
             if (url) {
-                showToast("URL Cloud disimpan! Menyinkronkan data...");
-                backupToSpreadsheet(false);
+                showToast("URL Cloud disimpan! Mengambil data dari Spreadsheet...");
+                muatDariSpreadsheet(false);
             } else {
                 showToast("URL Cloud dikosongkan.");
             }
@@ -3109,6 +3310,150 @@ function buatResponsJSON_(obj) {
             } catch (e) {
                 showToast("Gagal mengekspor file cadangan.");
             }
+        }
+
+        function imporDariExcel(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const wb = XLSX.read(data, { type: 'array' });
+
+                    // 1. Baca Sheet Anggota
+                    const shAnggotaName = wb.SheetNames.find(n => n.toLowerCase().includes('anggota'));
+                    if (shAnggotaName) {
+                        const rowsA = XLSX.utils.sheet_to_json(wb.Sheets[shAnggotaName], { defval: "" });
+                        const parsedAnggota = [];
+                        rowsA.forEach((r, idx) => {
+                            const id = String(r['ID Anggota'] || r['ID'] || "").trim();
+                            const nama = String(r['Nama Lengkap'] || r['Nama'] || "").trim();
+                            if (id || nama) {
+                                const oldAg = dataAnggota.find(a => a.id === id) || {};
+                                parsedAnggota.push({
+                                    id: id || `KMC-${String(idx + 1).padStart(3, '0')}`,
+                                    nama: nama,
+                                    jabatan: String(r['Jabatan'] || "Anggota").trim(),
+                                    motor: String(r['Tipe Motor'] || r['Motor'] || "").trim(),
+                                    nopol: String(r['No. Polisi'] || r['Nopol'] || "").trim(),
+                                    hp: String(r['No. WhatsApp'] || r['No HP'] || "").replace(/^'/, "").trim(),
+                                    alamat: String(r['Alamat Domisili'] || r['Alamat'] || "").trim(),
+                                    tglGabung: String(r['Tgl Bergabung'] || "").trim(),
+                                    foto: oldAg.foto || "",
+                                    fotoMotor: oldAg.fotoMotor || ""
+                                });
+                            }
+                        });
+                        if (parsedAnggota.length > 0) dataAnggota = parsedAnggota;
+                    }
+
+                    // 2. Baca Sheet Prospek
+                    const shProspekName = wb.SheetNames.find(n => n.toLowerCase().includes('prospek'));
+                    if (shProspekName) {
+                        const rowsP = XLSX.utils.sheet_to_json(wb.Sheets[shProspekName], { defval: "" });
+                        const parsedProspek = [];
+                        rowsP.forEach((r, idx) => {
+                            const id = String(r['ID Prospek'] || r['ID'] || "").trim();
+                            const nama = String(r['Nama Lengkap'] || r['Nama'] || "").trim();
+                            if (id || nama) {
+                                parsedProspek.push({
+                                    id: id || `PRO-${String(idx + 1).padStart(2, '0')}`,
+                                    nama: nama,
+                                    motor: String(r['Tipe Motor'] || r['Motor'] || "").trim(),
+                                    nopol: String(r['No. Polisi'] || r['Nopol'] || "").trim(),
+                                    hp: String(r['No. WhatsApp'] || r['No HP'] || "").replace(/^'/, "").trim(),
+                                    alamat: String(r['Alamat Domisili'] || r['Alamat'] || "").trim(),
+                                    foto: ""
+                                });
+                            }
+                        });
+                        dataProspek = parsedProspek;
+                    }
+
+                    // 3. Baca Sheet Keuangan
+                    const shKasName = wb.SheetNames.find(n => n.toLowerCase().includes('keuangan') || n.toLowerCase().includes('kas'));
+                    if (shKasName) {
+                        const rowsK = XLSX.utils.sheet_to_json(wb.Sheets[shKasName], { defval: "" });
+                        const parsedKas = [];
+                        rowsK.forEach((r, idx) => {
+                            const ket = String(r['Keterangan Transaksi'] || r['Keterangan'] || "").trim();
+                            if (!ket || ket === "TOTAL MUTASI KAS" || ket === "SALDO KAS AKHIR (RP)") return;
+                            const masukVal = Number(String(r['Pemasukan (Rp)'] || r['Pemasukan'] || "0").replace(/[^0-9.-]+/g, "")) || 0;
+                            const keluarVal = Number(String(r['Pengeluaran (Rp)'] || r['Pengeluaran'] || "0").replace(/[^0-9.-]+/g, "")) || 0;
+                            const jenisRaw = String(r['Jenis'] || "").toLowerCase();
+                            const isMasuk = jenisRaw.includes('masuk') || (masukVal > 0 && keluarVal === 0);
+                            const nom = isMasuk ? masukVal : keluarVal;
+                            if (nom > 0) {
+                                parsedKas.push({
+                                    id: Number(r['ID']) || (idx + 1),
+                                    tgl: String(r['Tanggal'] || new Date().toISOString().slice(0, 10)).trim(),
+                                    ket: ket,
+                                    jenis: isMasuk ? 'masuk' : 'keluar',
+                                    nominal: nom
+                                });
+                            }
+                        });
+                        if (parsedKas.length > 0) riwayatKeuangan = parsedKas;
+                    }
+
+                    // 4. Baca Sheet Iuran
+                    const shIuranName = wb.SheetNames.find(n => n.toLowerCase().includes('iuran'));
+                    if (shIuranName) {
+                        const rowsI = XLSX.utils.sheet_to_json(wb.Sheets[shIuranName], { defval: "" });
+                        const blnCols = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
+                        rowsI.forEach(r => {
+                            const namaAg = String(r['Nama Anggota'] || r['Nama'] || "").trim();
+                            const idAg = String(r['ID Anggota'] || r['ID'] || "").trim();
+                            const thn = parseInt(r['Tahun']) || tahunAktifIuran;
+                            let agMatch = dataAnggota.find(a => (idAg && a.id === idAg) || a.nama.toLowerCase() === namaAg.toLowerCase());
+                            if (agMatch) {
+                                let iurItem = dataIuran.find(i => i.id === agMatch.id);
+                                if (!iurItem) {
+                                    iurItem = { id: agMatch.id, nama: agMatch.nama, bayar: {} };
+                                    dataIuran.push(iurItem);
+                                }
+                                iurItem.bayar[thn] = blnCols.map(b => {
+                                    const val = String(r[b] || "").toUpperCase().trim();
+                                    return { lunas: val === "LUNAS" || val === "✔" || val === "TRUE", bukti: "" };
+                                });
+                            }
+                        });
+                    }
+
+                    // 5. Baca Sheet Agenda
+                    const shAgendaName = wb.SheetNames.find(n => n.toLowerCase().includes('agenda'));
+                    if (shAgendaName) {
+                        const rowsG = XLSX.utils.sheet_to_json(wb.Sheets[shAgendaName], { defval: "" });
+                        const parsedAgenda = [];
+                        rowsG.forEach((r, idx) => {
+                            const judul = String(r['Judul Kegiatan'] || r['Kegiatan'] || "").trim();
+                            if (judul) {
+                                parsedAgenda.push({
+                                    id: String(r['ID Agenda'] || r['ID'] || `AGD-${idx + 1}`).trim(),
+                                    kategori: String(r['Kategori'] || "Kopdar").trim(),
+                                    judul: judul,
+                                    tgl: String(r['Tanggal'] || "").trim(),
+                                    waktu: String(r['Waktu'] || "").trim(),
+                                    lokasi: String(r['Lokasi / Titik Kumpul'] || r['Lokasi'] || "").trim(),
+                                    ket: String(r['Catatan'] || "").trim()
+                                });
+                            }
+                        });
+                        if (parsedAgenda.length > 0) dataAgenda = parsedAgenda;
+                    }
+
+                    normalisasiDataIuran();
+                    simpanLokal(false);
+                    renderHeaderInfo();
+                    switchTab('dasbor');
+                    showToast("Seluruh data berhasil dipulihkan dari file Spreadsheet (.xlsx)!");
+                } catch (err) {
+                    console.error(err);
+                    showToast("Gagal membaca file Excel (.xlsx).");
+                }
+            };
+            reader.readAsArrayBuffer(file);
         }
 
         function imporJSONLokal(event) {
